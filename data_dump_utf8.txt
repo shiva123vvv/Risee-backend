@@ -1,0 +1,8 @@
+﻿[dotenv@17.3.1] injecting env (5) from .env -- tip: ΓÜÖ∩╕Å  write to custom object with { processEnv: myObject }
+Γ£à Connected to the PostgreSQL database
+--- USERS ---
+ID: 2, Name: Zenvera International Limited, Username: zenvera-international-limited
+ID: 4, Name: test1234, Username: test1234
+ID: 1, Name: Sivanesan Kumarvel, Username: sivanesan-kumarvel
+--- CAMPAIGNS ---
+ID: 1, Title: CN la domain name system, Slug: cn-la-domain-name-system

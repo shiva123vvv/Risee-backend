@@ -1,0 +1,63 @@
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+require('dotenv').config();
+
+const createTables = require('./config/initDb');
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(morgan('dev'));
+app.use('/uploads', express.static('uploads'));
+
+// Initialize Database
+createTables();
+
+// Routes
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/campaigns', require('./routes/campaignRoutes'));
+app.use('/api/donations', require('./routes/donationRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/withdrawals', require('./routes/withdrawalRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
+
+// Recovery DB Route
+app.get('/api/migrate-now', async (req, res) => {
+    const { pool } = require('./config/db');
+    try {
+        await pool.query(`ALTER TABLE withdraw_requests 
+            ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            ADD COLUMN IF NOT EXISTS method VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS account_holder_name VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS ifsc_code VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS upi_id VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS paypal_email VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP,
+            ADD COLUMN IF NOT EXISTS admin_note TEXT;
+        `);
+        await pool.query(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS gateway_fees DECIMAL(12, 2) DEFAULT 0;`);
+        res.json({ success: true, message: 'All schemas patched successfully!' });
+    } catch(err) {
+        console.error("MIGRATION_ERR:", err);
+        res.json({ success: false, message: err.message, stack: err.stack, details: JSON.stringify(err) });
+    }
+});
+
+// Error Handling Middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({
+        success: false,
+        message: err.message || 'Internal Server Error'
+    });
+});
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});

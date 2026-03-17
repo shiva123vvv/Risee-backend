@@ -1,0 +1,153 @@
+const { pool } = require('./db');
+
+const createTables = async () => {
+    const tables = [
+        `CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            username VARCHAR(50) UNIQUE,
+            password VARCHAR(255) NOT NULL,
+            role VARCHAR(20) DEFAULT 'donor' CHECK (role IN ('donor', 'fundraiser', 'admin')),
+            phone VARCHAR(20),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(50) UNIQUE`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)`,
+        `CREATE TABLE IF NOT EXISTS campaigns (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            slug VARCHAR(255) UNIQUE,
+            title VARCHAR(255) NOT NULL,
+            description TEXT NOT NULL,
+            story TEXT,
+            goal_amount DECIMAL(12, 2) NOT NULL,
+            raised_amount DECIMAL(12, 2) DEFAULT 0,
+            currency VARCHAR(10) DEFAULT 'INR',
+            category VARCHAR(100),
+            urgency_level VARCHAR(20) DEFAULT 'Standard',
+            beneficiary_name VARCHAR(100),
+            beneficiary_type VARCHAR(50),
+            beneficiary_relation VARCHAR(100),
+            beneficiary_age VARCHAR(10),
+            beneficiary_location VARCHAR(255),
+            beneficiary_country_code VARCHAR(10),
+            beneficiary_phone VARCHAR(20),
+            beneficiary_base VARCHAR(100),
+            beneficiary_employment VARCHAR(50),
+            organizer_name VARCHAR(100),
+            organizer_email VARCHAR(100),
+            organizer_country_code VARCHAR(10),
+            organizer_phone VARCHAR(20),
+            contact_method VARCHAR(20),
+            location VARCHAR(255),
+            hospital_name VARCHAR(255),
+            hospital_location VARCHAR(255),
+            ailment VARCHAR(255),
+            school_location VARCHAR(255),
+            ngo_registration_no VARCHAR(100),
+            ngo_type VARCHAR(100),
+            event_name VARCHAR(255),
+            event_date DATE,
+            business_name VARCHAR(255),
+            industry_type VARCHAR(100),
+            project_name VARCHAR(255),
+            sports_event VARCHAR(255),
+            animal_species VARCHAR(100),
+            shelter_name VARCHAR(255),
+            religious_institution VARCHAR(255),
+            religious_location VARCHAR(255),
+            environment_project VARCHAR(255),
+            image_url VARCHAR(255),
+            documents JSONB DEFAULT '[]',
+            status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'rejected')),
+            end_date TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS end_date TIMESTAMP`,
+        `UPDATE campaigns SET end_date = NOW() + INTERVAL '30 days' WHERE end_date IS NULL`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS slug VARCHAR(255) UNIQUE`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'INR'`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS urgency_level VARCHAR(20) DEFAULT 'Standard'`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS beneficiary_relation VARCHAR(100)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS beneficiary_age VARCHAR(10)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS beneficiary_location VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS beneficiary_country_code VARCHAR(10)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS beneficiary_phone VARCHAR(20)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS beneficiary_base VARCHAR(100)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS beneficiary_employment VARCHAR(50)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS organizer_name VARCHAR(100)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS organizer_email VARCHAR(100)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS organizer_country_code VARCHAR(10)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS hospital_name VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS hospital_location VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS ailment VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS education_institution VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS memorial_for VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS school_location VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS ngo_registration_no VARCHAR(100)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS ngo_type VARCHAR(100)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS event_name VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS event_date DATE`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS business_name VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS industry_type VARCHAR(100)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS project_name VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS sports_event VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS animal_species VARCHAR(100)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS shelter_name VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS religious_institution VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS religious_location VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS environment_project VARCHAR(255)`,
+        `ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS gateway_fees DECIMAL(12, 2) DEFAULT 0`,
+        `CREATE TABLE IF NOT EXISTS campaign_updates (
+            id SERIAL PRIMARY KEY,
+            campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            image_url VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `ALTER TABLE campaign_updates ADD COLUMN IF NOT EXISTS image_url VARCHAR(255)`,
+        `CREATE TABLE IF NOT EXISTS donations (
+            id SERIAL PRIMARY KEY,
+            campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+            donor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            donor_name VARCHAR(100),
+            amount DECIMAL(12, 2) NOT NULL,
+            tip_amount DECIMAL(12, 2) DEFAULT 0,
+            email VARCHAR(255),
+            phone VARCHAR(20),
+            message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `CREATE TABLE IF NOT EXISTS withdraw_requests (
+            id SERIAL PRIMARY KEY,
+            campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+            amount DECIMAL(12, 2) NOT NULL,
+            status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'completed', 'rejected')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `ALTER TABLE withdraw_requests 
+            ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            ADD COLUMN IF NOT EXISTS method VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS account_holder_name VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS ifsc_code VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS upi_id VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS paypal_email VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP,
+            ADD COLUMN IF NOT EXISTS admin_note TEXT`
+    ];
+
+    try {
+        for (let query of tables) {
+            await pool.query(query);
+        }
+        console.log('✅ Tables checked/created successfully');
+    } catch (err) {
+        console.error('❌ Error creating tables:', err);
+    }
+};
+
+module.exports = createTables;
