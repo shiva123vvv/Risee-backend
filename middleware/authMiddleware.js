@@ -8,7 +8,7 @@ const authMiddleware = (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'risee_fallback_secret_key');
         req.user = decoded;
         next();
     } catch (err) {
@@ -33,7 +33,7 @@ const optionalAuthMiddleware = (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'risee_fallback_secret_key');
         req.user = decoded;
         next();
     } catch (err) {

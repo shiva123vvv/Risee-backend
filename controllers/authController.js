@@ -23,7 +23,7 @@ exports.register = async (req, res) => {
 
         const token = jwt.sign(
             { id: newUser.rows[0].id, role: newUser.rows[0].role },
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || 'risee_fallback_secret_key',
             { expiresIn: '1d' }
         );
 
@@ -48,7 +48,7 @@ exports.login = async (req, res) => {
 
         const token = jwt.sign(
             { id: user.rows[0].id, role: user.rows[0].role },
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || 'risee_fallback_secret_key',
             { expiresIn: '1d' }
         );
 
@@ -99,7 +99,7 @@ exports.syncWithFirebase = async (req, res) => {
 
         const token = jwt.sign(
             { id: user.rows[0].id, role: user.rows[0].role },
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || 'risee_fallback_secret_key',
             { expiresIn: '1d' }
         );
 
@@ -165,7 +165,7 @@ exports.switchRole = async (req, res) => {
 
         const token = jwt.sign(
             { id: result.rows[0].id, role: result.rows[0].role },
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || 'risee_fallback_secret_key',
             { expiresIn: '1d' }
         );
 
