@@ -1,35 +1,44 @@
 const db = require('../config/db');
-const Razorpay = require('razorpay');
+const { Cashfree, CFEnvironment } = require('cashfree-pg');
+
+const cashfree = new Cashfree();
+cashfree.XClientId = process.env.CASHFREE_APP_ID;
+cashfree.XClientSecret = process.env.CASHFREE_SECRET_KEY;
+cashfree.XEnvironment = CFEnvironment.PRODUCTION;
 
 exports.createOrder = async (req, res) => {
-    const { amount, currency = 'INR' } = req.body;
+    const { amount, currency = 'INR', donor_email, donor_phone } = req.body;
     try {
-        if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-            return res.status(500).json({ success: false, message: 'Razorpay keys are not configured on the server yet' });
+        let cleanPhone = (donor_phone || "").replace(/[^\d+]/g, "");
+        if (!cleanPhone.startsWith("+") && cleanPhone.length > 10) {
+            cleanPhone = "+" + cleanPhone;
+        }
+        if (cleanPhone.length < 10 || cleanPhone.length > 15) {
+            cleanPhone = "9999999999";
         }
 
-        const razorpay = new Razorpay({
-            key_id: process.env.RAZORPAY_KEY_ID,
-            key_secret: process.env.RAZORPAY_KEY_SECRET,
-        });
-
-        const isZeroDecimal = ['jpy', 'krw', 'vnd', 'bif', 'clp', 'djf', 'gnf', 'kmf', 'mga', 'pyg', 'rwf', 'ugx', 'vuv', 'xaf', 'xof', 'xpf'].includes(currency.toLowerCase());
-        const multiplier = isZeroDecimal ? 1 : 100;
-
-        const options = {
-            amount: Math.round(amount * multiplier), // amount in the smallest currency unit
-            currency: currency.toUpperCase(),
-            receipt: `receipt_${Date.now()}`,
+        const request = {
+            order_amount: Math.round(parseFloat(amount) * 100) / 100, // strictly 2 decimals max
+            order_currency: currency.toUpperCase(),
+            customer_details: {
+                customer_id: req.user?.id ? `user_${req.user.id}_${Date.now()}` : `guest_${Date.now()}`,
+                customer_phone: cleanPhone,
+                customer_email: donor_email || "guest@example.com"
+            }
         };
-        const order = await razorpay.orders.create(options);
-        res.json({ success: true, order });
+
+        const response = await cashfree.PGCreateOrder(request);
+        res.json({ success: true, order: response.data });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        const errorData = err.response?.data || err.message;
+        require('fs').appendFileSync('error_trace.log', JSON.stringify(errorData, null, 2) + '\n');
+        console.error('Cashfree Create Order Error:', errorData);
+        res.status(500).json({ success: false, message: err.message, errorDetails: errorData });
     }
 };
 
 exports.donate = async (req, res) => {
-    const { campaign_id, native_amount, native_tip_amount, amount_inr, tip_inr, donor_name, email, phone, razorpay_payment_id, razorpay_order_id, razorpay_signature, donation_currency = 'INR' } = req.body;
+    const { campaign_id, native_amount, native_tip_amount, amount_inr, tip_inr, donor_name, email, phone, cashfree_order_id, cashfree_payment_session_id, donation_currency = 'INR' } = req.body;
     const donor_id = req.user?.id; // user id from middleware
 
     try {
@@ -39,11 +48,11 @@ exports.donate = async (req, res) => {
         // 1. Record the donation natively exactly as the donor paid
         const newDonation = await db.query(
             'INSERT INTO donations (campaign_id, donor_id, amount, tip_amount, donor_name, email, phone, razorpay_payment_id, donation_currency) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-            [campaign_id, donor_id || null, native_amount || amount_inr, native_tip_amount || tip_inr, donor_name || 'Anonymous Friend', email || null, phone || null, razorpay_payment_id, donation_currency]
+            [campaign_id, donor_id || null, native_amount || amount_inr, native_tip_amount || tip_inr, donor_name || 'Anonymous Friend', email || null, phone || null, cashfree_order_id, donation_currency]
         );
 
-        // Cost of processing flat 2-3% based on INR volume across multiple currencies via Razorpay
-        const gatewayFee = (amount_inr || native_amount) * 0.03;
+        // Cost of processing flat 3.5% common for International and India
+        const gatewayFee = (amount_inr || native_amount) * 0.035;
 
         // 2. Update the campaign's raised amount with standard INR value
         await db.query(
