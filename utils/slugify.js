@@ -1,6 +1,7 @@
 const pool = require('../config/db').pool;
 
 const slugify = (text) => {
+    if (!text) return 'user-' + Math.floor(Math.random() * 10000);
     return text
         .toString()
         .toLowerCase()
@@ -26,7 +27,7 @@ const generateUniqueSlug = async (title, table = 'campaigns', column = 'slug') =
 };
 
 const generateUniqueUsername = async (nameOrEmail) => {
-    let base = slugify(nameOrEmail.includes('@') ? nameOrEmail.split('@')[0] : nameOrEmail);
+    let base = slugify(nameOrEmail && typeof nameOrEmail === 'string' && nameOrEmail.includes('@') ? nameOrEmail.split('@')[0] : nameOrEmail);
     let username = base;
     let count = 1;
 

@@ -73,24 +73,29 @@ exports.login = async (req, res) => {
 exports.syncWithFirebase = async (req, res) => {
     const { email, name, role, phone } = req.body;
     try {
-        // Upsert user based on email
-        let user = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        let user;
+        if (email) {
+            user = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        } else if (phone) {
+            user = await db.query('SELECT * FROM users WHERE phone = $1', [phone]);
+        } else {
+            return res.status(400).json({ success: false, message: 'Email or phone required for sync' });
+        }
 
         const userRole = email === 'support.risee@gmail.com' ? 'admin' : (role || 'donor');
 
         if (user.rows.length === 0) {
-            // Create a random password for social login users (won't be used)
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(Math.random().toString(36), salt);
 
-            const username = await generateUniqueUsername(name || email);
+            const displayName = name || (email ? email.split('@')[0] : (phone ? phone.toString() : 'User'));
+            const username = await generateUniqueUsername(displayName);
 
             user = await db.query(
                 'INSERT INTO users (name, email, username, password, role, phone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, username, role, phone, bank_details',
-                [name || email.split('@')[0], email, username, hashedPassword, userRole, phone]
+                [displayName, email || null, username, hashedPassword, userRole, phone || null]
             );
         } else if (email === 'support.risee@gmail.com' && user.rows[0].role !== 'admin') {
-            // Update to admin if not already
             user = await db.query(
                 'UPDATE users SET role = $1 WHERE email = $2 RETURNING id, name, email, username, role, phone, bank_details',
                 ['admin', email]
