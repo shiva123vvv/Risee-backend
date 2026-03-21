@@ -14,6 +14,26 @@ app.use(express.json());
 app.use(morgan('dev'));
 app.use('/uploads', express.static('uploads'));
 
+const db = require('./config/db');
+app.get('/uploads/:filename', async (req, res) => {
+    try {
+        const { rows } = await db.query('SELECT data, mimetype FROM app_images WHERE filename = $1', [req.params.filename]);
+        if (rows.length > 0) {
+            const imgBuffer = Buffer.from(rows[0].data, 'base64');
+            res.writeHead(200, {
+                'Content-Type': rows[0].mimetype,
+                'Content-Length': imgBuffer.length,
+                'Cache-Control': 'public, max-age=31536000'
+            });
+            return res.end(imgBuffer);
+        }
+        // Fallback to legacy Render host for very old images before the Railway migration
+        res.redirect(`https://risee-backend.onrender.com/uploads/${req.params.filename}`);
+    } catch (err) {
+        res.redirect(`https://risee-backend.onrender.com/uploads/${req.params.filename}`);
+    }
+});
+
 // Initialize Database
 createTables();
 
