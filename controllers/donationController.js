@@ -1,11 +1,5 @@
 const db = require('../config/db');
-const { Cashfree, CFEnvironment } = require('cashfree-pg');
-
-Cashfree.XClientId = process.env.CASHFREE_APP_ID;
-Cashfree.XClientSecret = process.env.CASHFREE_SECRET_KEY;
-Cashfree.XEnvironment = CFEnvironment.PRODUCTION;
-
-const cashfree = new Cashfree();
+const axios = require('axios');
 
 exports.createOrder = async (req, res) => {
     const { amount, currency = 'INR', donor_email, donor_phone } = req.body;
@@ -18,7 +12,7 @@ exports.createOrder = async (req, res) => {
             cleanPhone = "9999999999";
         }
 
-        const request = {
+        const requestPayload = {
             order_amount: Math.round(parseFloat(amount) * 100) / 100, // strictly 2 decimals max
             order_currency: currency.toUpperCase(),
             customer_details: {
@@ -28,14 +22,22 @@ exports.createOrder = async (req, res) => {
             }
         };
 
-        const response = await cashfree.PGCreateOrder(request);
+        const response = await axios.post('https://api.cashfree.com/pg/orders', requestPayload, {
+            headers: {
+                'X-Client-Id': process.env.CASHFREE_APP_ID,
+                'X-Client-Secret': process.env.CASHFREE_SECRET_KEY,
+                'x-api-version': '2023-08-01',
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        });
+
         res.json({ success: true, order: response.data });
     } catch (err) {
         const errorData = err.response?.data || err.message;
         const errorMessage = errorData?.message || err.message;
         require('fs').appendFileSync('error_trace.log', JSON.stringify(errorData, null, 2) + '\n');
         console.error('Cashfree Create Order Error:', errorData);
-        // Send a 400 Bad Request for Cashfree validation/provider errors, ensuring the message is clear to the client
         res.status(err.response?.status || 500).json({ success: false, message: errorMessage, errorDetails: errorData });
     }
 };
