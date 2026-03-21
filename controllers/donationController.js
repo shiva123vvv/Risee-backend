@@ -1,10 +1,11 @@
 const db = require('../config/db');
 const { Cashfree, CFEnvironment } = require('cashfree-pg');
 
+Cashfree.XClientId = process.env.CASHFREE_APP_ID;
+Cashfree.XClientSecret = process.env.CASHFREE_SECRET_KEY;
+Cashfree.XEnvironment = CFEnvironment.PRODUCTION;
+
 const cashfree = new Cashfree();
-cashfree.XClientId = process.env.CASHFREE_APP_ID;
-cashfree.XClientSecret = process.env.CASHFREE_SECRET_KEY;
-cashfree.XEnvironment = CFEnvironment.PRODUCTION;
 
 exports.createOrder = async (req, res) => {
     const { amount, currency = 'INR', donor_email, donor_phone } = req.body;
@@ -31,9 +32,11 @@ exports.createOrder = async (req, res) => {
         res.json({ success: true, order: response.data });
     } catch (err) {
         const errorData = err.response?.data || err.message;
+        const errorMessage = errorData?.message || err.message;
         require('fs').appendFileSync('error_trace.log', JSON.stringify(errorData, null, 2) + '\n');
         console.error('Cashfree Create Order Error:', errorData);
-        res.status(500).json({ success: false, message: err.message, errorDetails: errorData });
+        // Send a 400 Bad Request for Cashfree validation/provider errors, ensuring the message is clear to the client
+        res.status(err.response?.status || 500).json({ success: false, message: errorMessage, errorDetails: errorData });
     }
 };
 
