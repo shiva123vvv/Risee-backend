@@ -28,9 +28,17 @@ app.get('/uploads/:filename', async (req, res) => {
             return res.end(imgBuffer);
         }
         // Fallback to legacy Render host for very old images before the Railway migration
-        res.redirect(`https://risee-backend.onrender.com/uploads/${req.params.filename}`);
+        const legacyUrl = `https://risee-backend.onrender.com/uploads/${req.params.filename}`;
+        try {
+            const axios = require('axios');
+            await axios.head(legacyUrl); // check if the image still exists on Render
+            res.redirect(legacyUrl);
+        } catch (e) {
+            // Render wiped the old ephemeral image permanently; fallback to aesthetic placeholder
+            res.redirect('https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?auto=format&fit=crop&q=80');
+        }
     } catch (err) {
-        res.redirect(`https://risee-backend.onrender.com/uploads/${req.params.filename}`);
+        res.redirect('https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?auto=format&fit=crop&q=80');
     }
 });
 
